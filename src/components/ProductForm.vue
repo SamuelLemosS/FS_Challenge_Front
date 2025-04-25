@@ -1,52 +1,78 @@
 <template>
-    <v-dialog v-model="dialog" persistent max-width="500px">
-      <v-card>
-        <v-card-title>{{ productLocal.id ? 'Edit Product' : 'New Product' }}</v-card-title>
-        <v-card-text>
-          <v-text-field v-model="productLocal.name" label="Name" />
-          <v-text-field v-model="productLocal.price" label="Price" type="number" />
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn color="blue darken-1" text @click="$emit('close')">Cancel</v-btn>
-          <v-btn color="green darken-1" text @click="save">Save</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-  </template>
-  
-  <script>
-  import api from '@/services/api'
-  
-  export default {
-    props: ['product'],
-    data() {
-      return {
-        dialog: true,
-        productLocal: { ...this.product }
-      }
-    },
-    watch: {
-      product: {
-        immediate: true,
-        handler(newValue) {
-          this.productLocal = { ...newValue }
-        }
-      }
-    },
-    methods: {
-      save() {
-        const method = this.productLocal.id ? 'put' : 'post'
-        const url = this.productLocal.id
-          ? `/products/${this.productLocal.id}`
-          : '/products'
-  
-        api[method](url, this.productLocal).then(() => {
-          this.$emit('save')
-          this.$emit('close')
-        })
-      }
-    }
+  <v-dialog v-model="isOpen" max-width="600px">
+    <v-card>
+      <v-card-title>{{ title }}</v-card-title>
+      <v-card-text>
+        <v-form ref="formRef" v-model="formValid">
+          <v-text-field
+            label="Nome"
+            v-model="form.name"
+            :rules="[v => !!v || 'Nome é obrigatório']"
+          />
+          <v-text-field
+            label="Preço"
+            v-model="form.price"
+            type="number"
+            :rules="[
+              v => !!v || 'Preço é obrigatório',
+              v => v > 0 || 'Preço deve ser maior que zero'
+            ]"
+          />
+          <v-text-field
+            label="Descrição"
+            v-model="form.description"
+            :rules="[v => !!v || 'Descrição é obrigatória']"
+          />
+        </v-form>
+      </v-card-text>
+      <v-card-actions>
+        <v-btn color="primary" @click="salvar">Salvar</v-btn>
+        <v-btn text @click="fechar">Cancelar</v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+</template>
+
+
+<script setup>
+import { ref, defineExpose, defineProps } from 'vue'
+import { updateItem, addItem } from '@/services/api'
+
+const props = defineProps({
+  onSave: Function
+})
+
+const isOpen = ref(false)
+const formValid = ref(false)
+const formRef = ref(null)
+const form = ref({ name: '', price: 0, description: '' })
+let createItem = ref(true)
+let title = ref('Editar o item')
+
+function abrir(item = { name: '', price: 0, description: '' }, create = true) {
+  createItem.value = create
+  title.value = create ? 'Adicionar o item' : 'Editar o item'
+  form.value = { ...item }
+  isOpen.value = true
+}
+
+function fechar() {
+  isOpen.value = false
+}
+
+async function salvar() {
+  const isValid = await formRef.value.validate()
+  console.log(isValid.valid)
+  if (!isValid.valid) return
+
+  if (createItem.value) {
+    await addItem(form.value)
+  } else {
+    await updateItem(form.value)
   }
-  </script>
-  
+  props.onSave?.()
+  fechar()
+}
+
+defineExpose({ abrir })
+</script>
